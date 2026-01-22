@@ -1,0 +1,6 @@
+@DbSentinel.Brain_HostAddress = http://localhost:5148
+
+GET {{DbSentinel.Brain_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
