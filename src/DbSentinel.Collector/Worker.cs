@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using Azure.Storage.Blobs.Models;
+using DbSentinel.Collector.Services;
+using Microsoft.SemanticKernel.Memory;
 
 namespace DbSentinel.Collector
 {
@@ -16,40 +18,49 @@ namespace DbSentinel.Collector
         private readonly ILogger<Worker> _logger;
         private readonly ISlowLogParser _parser;
         private readonly IConfiguration _configuration;
-        private Timer? _timer;
 
-        public Worker(ILogger<Worker> logger, ISlowLogParser parser, IConfiguration configuration)
+        private SlowLogProcessor _slowLogProcessor;
+
+        private readonly ISemanticTextMemory _memory;
+
+        public Worker(ILogger<Worker> logger, ISlowLogParser parser, IConfiguration configuration, SlowLogProcessor slowLogProcessor, ISemanticTextMemory memory)
         {
             _logger = logger;
             _parser = parser;
             _configuration = configuration;
+            _slowLogProcessor = slowLogProcessor;
+            _memory = memory;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            stoppingToken.Register(() => _logger.LogInformation("Worker service is stopping."));
 
-            _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromDays(1));
+            await DoWork(stoppingToken);
 
-            return Task.CompletedTask;
-        }
+            return;
 
-        private void DoWork(object? state)
-        {
-            var now = DateTime.Now;
-            var nextRunTime = now.Date.AddHours(8); // Schedule for 8 AM
-            if (now > nextRunTime)
+            // Lấy config, mặc định là 2 giờ sáng nếu không tìm thấy
+            var _executionHour = 2;
+            while (!stoppingToken.IsCancellationRequested)
             {
-                nextRunTime = nextRunTime.AddDays(1); // If 8 AM has passed, schedule for next day
+                var now = DateTime.Now;
+                var nextRun = now.Date.AddHours(_executionHour);
+
+                if (now > nextRun) nextRun = nextRun.AddDays(1);
+
+                var delay = nextRun - now;
+                await Task.Delay(delay, stoppingToken);
+
+                // Thực thi logic Ingest...
+                await DoWork(stoppingToken);
             }
 
-            var delay = nextRunTime - now;
-            _logger.LogInformation("Next run scheduled for: {runTime}", nextRunTime);
 
-            _timer?.Change(delay, TimeSpan.FromDays(1));
+        }
 
-            _logger.LogInformation("Worker running at: {time}", DateTime.Now);
-            FetchAndProcessLogsAsync().GetAwaiter().GetResult();
+        private async Task DoWork(CancellationToken stoppingToken = default)
+        {
+            await FetchAndProcessLogsAsync();
         }
 
         private async Task FetchAndProcessLogsAsync()
@@ -78,18 +89,16 @@ namespace DbSentinel.Collector
                 var prefix = $"{basePrefix}/y={previousDay.Year}/m={previousDay.Month:D2}/d={previousDay.Day:D2}";
 
                 _logger.LogInformation("Using blob prefix: {prefix}", prefix);
+
+                var rawLogs = new List<SlowLogEntry>();
                 await foreach (var blobItem in blobContainerClient.GetBlobsAsync(BlobTraits.None, BlobStates.All, prefix, default))
                 {
                     _logger.LogInformation("Processing blob: {blobName}", blobItem.Name);
                     var blobClient = blobContainerClient.GetBlobClient(blobItem.Name);
-                    var response = await blobClient.DownloadAsync();
-
-                    using var reader = new StreamReader(response.Value.Content);
-                    var blobContent = await reader.ReadToEndAsync();
-                    SlowLogEntry? slowLogEntry = null;
+                    List<SlowLogEntry>? logs;
                     try
                     {
-                        slowLogEntry = _parser.Parse(blobContent);
+                        logs = await GetEntriesFromBlobAsync(blobClient, default);
                     }
                     catch (Exception ex)
                     {
@@ -99,28 +108,46 @@ namespace DbSentinel.Collector
                     // Assuming each blob contains one JSON object
 
 
-                    if (slowLogEntry != null)
+                    if (logs != null)
                     {
-                        _logger.LogInformation("Parsed Slow Log Entry:\n" +
-                                               "Timestamp: {Timestamp}\n" +
-                                               "UserHost: {UserHost}\n" +
-                                               "ExecutionTime: {ExecutionTime}\n" +
-                                               "RowsExamined: {RowsExamined}\n" +
-                                               "Database: {Database}\n" +
-                                               "SqlStatement: {SqlStatement}",
-                                               slowLogEntry.Timestamp,
-                                               slowLogEntry.UserHost,
-                                               slowLogEntry.ExecutionTime,
-                                               slowLogEntry.RowsExamined,
-                                               slowLogEntry.Database,
-                                               slowLogEntry.SqlStatement);
-                        // Placeholder for sending to AI
-                        _logger.LogInformation("Handing off to AI for processing...");
+                        rawLogs.AddRange(logs);
                     }
                     else
                     {
                         _logger.LogWarning("Found a null slow log entry.");
                     }
+                }
+
+                if (rawLogs.Count > 0)
+                {
+                    var aggregatedResults = _slowLogProcessor.ProcessLogs(rawLogs);
+                    _logger.LogInformation("Aggregated Slow Query Results: {count} entries", aggregatedResults.Count);
+                    foreach (var log in aggregatedResults)
+                    {
+                        // Tạo nội dung giàu ngữ cảnh cho Gemini
+                        string contextText = $@"
+                            SQL Pattern: {log.QueryTemplate}
+                            Stats: Occurred {log.OccurrenceCount} times. 
+                            Avg Latency: {log.AvgExecutionTime:F2}s, Max: {log.MaxExecutionTime:F2}s.
+                            Avg Rows Examined: {log.AvgRowsExamined}.
+                            Last Seen: {log.LastSeen:yyyy-MM-dd HH:mm:ss} in DB: {log.Database}";
+
+                        // metadata để lọc nhanh trong Milvus
+                        string metadata = $"db:{log.Database}|count:{log.OccurrenceCount}|latency:{log.MaxExecutionTime}";
+
+                        // SaveInformationAsync sẽ dùng Fingerprint làm ID để tránh duplicate trong Milvus
+                        await _memory.SaveInformationAsync(
+                            collection: "slow_queries",
+                            text: contextText,
+                            id: log.Fingerprint,
+                            description: "Aggregated Slow Query Pattern",
+                            additionalMetadata: metadata
+                        );
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("No valid slow log entries found for processing.");
                 }
 
 
@@ -131,9 +158,48 @@ namespace DbSentinel.Collector
             }
         }
 
+
+        private async Task<List<SlowLogEntry>> GetEntriesFromBlobAsync(BlobClient blobClient, CancellationToken ct)
+{
+    var entries = new List<SlowLogEntry>();
+
+    // Mở stream trực tiếp từ Blob
+    using (Stream stream = await blobClient.OpenReadAsync(new BlobOpenReadOptions(allowModifications: false), ct))
+    using (StreamReader reader = new StreamReader(stream))
+    {
+        string? line;
+        while ((line = await reader.ReadLineAsync(ct)) != null)
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            try 
+            {
+                // Azure MySQL log format: Mỗi dòng là một đối tượng JSON độc lập
+                using var doc = JsonDocument.Parse(line);
+                var root = doc.RootElement;
+                var props = root.GetProperty("properties");
+
+                entries.Add(new SlowLogEntry
+                {
+                    Timestamp = root.GetProperty("time").GetDateTime(),
+                    SqlStatement = props.GetProperty("sql_text").GetString(),
+                    ExecutionTime = props.GetProperty("query_time").GetDouble(),
+                    RowsExamined = props.GetProperty("rows_examined").GetInt64(),
+                    Database = props.GetProperty("db").GetString(),
+                    UserHost = props.GetProperty("host").GetString()
+                });
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning("Dòng log không hợp lệ trong file {BlobName}: {Error}", blobClient.Name, ex.Message);
+            }
+        }
+    }
+    return entries;
+}
+
         public override void Dispose()
         {
-            _timer?.Dispose();
             base.Dispose();
         }
     }

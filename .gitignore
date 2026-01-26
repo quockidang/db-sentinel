@@ -4,3 +4,6 @@ obj
 .gemini
 .specify
 docs
+
+volumes
+specs

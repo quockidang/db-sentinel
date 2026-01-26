@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB-Wise Agent - Enterprise Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/material-palenight.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .font-mono {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Custom Markdown Styling */
+        .ai-answer-content h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            border-left: 4px solid #2563eb;
+            padding-left: 10px;
+        }
+
+        .ai-answer-content h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #334155;
+            margin-top: 1.25rem;
+        }
+
+        .ai-answer-content p {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+            color: #475569;
+        }
+
+        .ai-answer-content ul,
+        .ai-answer-content ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+            list-style-type: disc;
+        }
+
+        .ai-answer-content li {
+            margin-bottom: 0.5rem;
+            color: #475569;
+        }
+
+        .ai-answer-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .ai-answer-content th {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .ai-answer-content td {
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+        }
+
+        .ai-answer-content blockquote {
+            border-left: 4px solid #e2e8f0;
+            padding-left: 1rem;
+            font-style: italic;
+            color: #64748b;
+            margin: 1rem 0;
+        }
+
+        .ai-answer-content code {
+            background: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            color: #e11d48;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85em;
+        }
+
+        /* SQL terminal style */
+        .sql-card {
+            background: #0f172a;
+            border-left: 4px solid #10b981;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        /* Container cho SQL thô */
+        .sql-container {
+            position: relative;
+            background: #1a1b26;
+            /* Dark theme */
+            border-radius: 12px;
+            margin-top: 10px;
+            border: 1px solid #2d2e3e;
+        }
+
+        /* Header nhỏ của terminal */
+        .sql-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: #24283b;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            border-bottom: 1px solid #2d2e3e;
+        }
+
+        /* Cấu trúc bên trong code block */
+        pre code.hljs {
+            padding: 1.25rem !important;
+            background: transparent !important;
+            font-family: 'Fira Code', monospace !important;
+            font-size: 12px !important;
+            line-height: 1.6;
+        }
+
+        /* Nút Copy */
+        .copy-btn {
+            color: #94a3b8;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen">
+
+    <div class="max-w-5xl mx-auto py-8 px-4">
+        <header
+            class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-blue-600 rounded-xl shadow-blue-200 shadow-lg text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">DB-Wise Advisor</h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                        <p class="text-slate-500 text-xs font-medium uppercase tracking-wider">AI-Powered Database
+                            Optimization</p>
+                    </div>
+                </div>
+            </div>
+            <button onclick="triggerIngest()" id="btnIngest"
+                class="inline-flex items-center px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-all hover:shadow-lg active:scale-95 gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                        clip-rule="evenodd" />
+                </svg>
+                Sync Azure Logs
+            </button>
+        </header>
+
+        <main id="chatContainer" class="space-y-8 mb-28">
+            <div class="flex gap-4">
+                <div
+                    class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm border border-blue-200 flex-shrink-0 font-bold">
+                    AI</div>
+                <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-5 shadow-sm max-w-[85%]">
+                    <p class="text-slate-700 text-sm leading-relaxed">
+                        Xin chào! Tôi là trợ lý AI chuyên về tối ưu hóa MySQL. Tôi đã sẵn sàng phân tích các file log từ
+                        <b>Azure Storage Account</b> của bạn. Hãy đặt câu hỏi để bắt đầu.
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="fixed bottom-0 left-0 right-0 bg-slate-50/80 backdrop-blur-md border-t border-slate-200 p-6">
+            <div class="max-w-5xl mx-auto">
+                <div class="relative flex items-center">
+                    <input type="text" id="userInput" placeholder="Hỏi về hiệu năng database..."
+                        class="w-full bg-white border border-slate-300 rounded-2xl px-6 py-4 pr-32 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-slate-700 font-medium">
+                    <button onclick="askAgent()" id="btnSend"
+                        class="absolute right-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2">
+                        Gửi câu hỏi
+                    </button>
+                </div>
+                <p class="text-center text-[10px] text-slate-400 mt-3 font-medium uppercase tracking-widest">
+                    Gemini 1.5 Flash + Semantic Kernel + Milvus Vector DB
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const API_BASE = "https://localhost:5001"; // CHÚ Ý: Kiểm tra đúng Port của bạn
+
+        async function askAgent() {
+            const input = document.getElementById('userInput');
+            const question = input.value.trim();
+            if (!question) return;
+
+            renderUserMessage(question);
+            input.value = '';
+            setLoading(true);
+
+            try {
+                const response = await fetch(`${API_BASE}/ask-advisor?q=${encodeURIComponent(question)}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    renderAiMessage(data.answer, data.rawQueries);
+                } else {
+                    renderAiMessage("❌ Lỗi hệ thống: " + (data.message || "Không tìm thấy dữ liệu liên quan."));
+                }
+            } catch (error) {
+                renderAiMessage("❌ Lỗi kết nối: Không thể gọi tới Backend. Hãy kiểm tra CORS và port.");
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function renderUserMessage(text) {
+            const container = document.getElementById('chatContainer');
+            const html = `
+                <div class="flex gap-4 flex-row-reverse">
+                    <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white shadow-sm flex-shrink-0 font-bold">ME</div>
+                    <div class="bg-blue-600 text-white rounded-2xl rounded-tr-none p-5 shadow-md shadow-blue-100 max-w-[85%] font-medium">
+                        ${text}
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+            scrollToBottom();
+        }
+
+        function renderAiMessage(answer, rawQueries = []) {
+            const container = document.getElementById('chatContainer');
+
+            // Cấu hình marked để dùng highlight.js cho code blocks trong câu trả lời của AI
+            marked.setOptions({
+                highlight: function (code, lang) {
+                    if (lang && hljs.getLanguage(lang)) {
+                        return hljs.highlight(code, { language: lang }).value;
+                    }
+                    return hljs.highlightAuto(code).value;
+                }
+            });
+
+            const formattedAnswer = marked.parse(answer);
+
+            let sqlSection = '';
+            if (rawQueries && rawQueries.length > 0) {
+                sqlSection = `
+            <div class="mt-8 border-t border-slate-100 pt-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="flex h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                    <h4 class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Dữ liệu SQL thô phát hiện được</h4>
+                </div>
+                <div class="space-y-4">
+                    ${rawQueries.map((sql, index) => {
+                    // Format SQL cơ bản (viết hoa từ khóa) để nhìn đẹp hơn
+                    const beautifiedSql = sql.replace(/\b(SELECT|FROM|WHERE|LEFT JOIN|JOIN|ORDER BY|GROUP BY|ON|AND|OR|IN|INSERT INTO|VALUES|LIMIT)\b/gi, function (x) {
+                        return x.toUpperCase();
+                    });
+
+                    return `
+                        <div class="sql-container">
+                            <div class="sql-header">
+                                <span class="text-[10px] font-mono text-slate-500">query_${index + 1}.sql</span>
+                                <button onclick="copyToClipboard(this, \`${beautifiedSql.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" class="copy-btn flex items-center gap-1 text-[10px] font-bold">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    COPY
+                                </button>
+                            </div>
+                            <pre><code class="language-sql">${beautifiedSql}</code></pre>
+                        </div>`;
+                }).join('')}
+                </div>
+            </div>
+        `;
+            }
+
+            const html = `
+        <div class="flex gap-4">
+            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg flex-shrink-0 font-bold">AI</div>
+            <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-8 shadow-sm max-w-[90%]">
+                <div class="ai-answer-content text-sm">
+                    ${formattedAnswer}
+                </div>
+                ${sqlSection}
+            </div>
+        </div>
+    `;
+
+            container.insertAdjacentHTML('beforeend', html);
+
+            // Yêu cầu Highlight.js quét lại toàn bộ block mới render
+            document.querySelectorAll('pre code').forEach((el) => {
+                hljs.highlightElement(el);
+            });
+
+            scrollToBottom();
+        }
+
+        // Hàm hỗ trợ Copy
+        function copyToClipboard(btn, text) {
+            navigator.clipboard.writeText(text);
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<span class="text-emerald-400">✓ COPIED</span>`;
+            setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+        }
+
+        async function triggerIngest() {
+            const btn = document.getElementById('btnIngest');
+            const oldHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `⏳ Syncing...`;
+
+            try {
+                const res = await fetch(`${API_BASE}/rag/ingest`, { method: 'POST' });
+                if (res.ok) alert("✅ Sync thành công! Agent đã sẵn sàng.");
+                else alert("❌ Lỗi khi Sync dữ liệu.");
+            } catch (e) {
+                alert("❌ Không kết nối được Backend.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = oldHtml;
+            }
+        }
+
+        function setLoading(isLoading) {
+            const btn = document.getElementById('btnSend');
+            btn.disabled = isLoading;
+            btn.innerHTML = isLoading ? `<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>` : "Gửi câu hỏi";
+        }
+
+        function scrollToBottom() {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        document.getElementById('userInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') askAgent();
+        });
+    </script>
+</body>
+
+</html>
