@@ -7,3 +7,7 @@ docs
 
 volumes
 specs
+
+src/DbSentinel.Brain/appsettings.Development.json
+src/DbSentinel.Collector/appsettings.Development.json
+
